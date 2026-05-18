@@ -24,12 +24,8 @@
 /server/hub/
 /server/hub_nether/
 /server/hub_the_end/
-/server/game/
-/server/game_nether/
-/server/game_the_end/
-/server/world/
-/server/world_nether/
-/server/world_the_end/
+/server/game*/
+/server/world*/
 
 # ===========================================================
 #  Build output & runtime plugin data
@@ -53,6 +49,7 @@
 /server/commands.yml
 /server/permissions.yml
 /server/spigot.yml
+/server/.console_history
 /server/config/
 /server/plugins/.paper-remapped/
 /server/plugins/bStats/

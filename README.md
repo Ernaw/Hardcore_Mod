@@ -34,9 +34,13 @@ Minecraft client, no mods required.
   the whole team feels it. If one player eats, everyone is fed.
 - **Hardcore.** If any player dies — or the shared health hits zero — the
   game is over for everyone.
-- **Full world regeneration.** On game over, the Overworld, Nether and End
-  are unloaded, deleted, and recreated with a brand-new random seed. The next
-  run starts from absolute zero.
+- **Full world regeneration.** On game over, a brand-new Overworld / Nether /
+  End is created with a new random seed (new spawn & biomes). The world is
+  kept in RAM and never written to disk, so regeneration is instant — **no
+  server restart, no folder deletion**.
+- **Everything resets.** Each run, every player's advancements, statistics,
+  discovered recipes, ender chest, inventory and XP are wiped — a true fresh
+  start, as if joining a brand-new server.
 - **Lobby with stats.** Between runs, players wait in a void hub showing:
   - number of **games played**
   - **last survival time** and the **best record**
@@ -172,12 +176,18 @@ vanilla hardcore would ban/spectate on death and break the lobby flow),
 
 Permission: `hardcoreshared.admin` (OP by default).
 
+`/hc stats` is open to everyone; the rest require OP / the
+`hardcoreshared.admin` permission. The command is always recognised — a
+non-admin gets a clear "OP required" message instead of "unknown command".
+
 | Command | Effect |
 |---|---|
-| `/hc start` | Force a new run (from the lobby) |
-| `/hc stop` | End the current run (triggers regeneration) |
-| `/hc stats` | Show statistics and current state |
-| `/hc reload` | Reload `config.yml` |
+| `/hc stats` | Show stats, current world, difficulty and seed |
+| `/hc start` | Force a new run (from the lobby) — *admin* |
+| `/hc stop` | End the current run (triggers regeneration) — *admin* |
+| `/hc reload` | Reload `config.yml` — *admin* |
+| `/hc resetstats` | Reset games played / best / last time — *admin* |
+| `/hc cleanworlds` | Best-effort sweep of leftover game-world folders — *admin* |
 
 ---
 
@@ -228,11 +238,34 @@ when Paper prepares the default world; world *creation* is deferred to the
 first tick (creating worlds during `STARTUP` is forbidden). A small quartz
 platform with barrier walls is built around spawn.
 
-**World regeneration.** On game over, players are sent to the lobby, then the
-game worlds (`game`, `game_nether`, `game_the_end`) are unloaded, their
-folders deleted (with retry to survive transient Windows file locks), and
-recreated with a fresh random seed. Nether/End portal linking between these
-non-default worlds is handled by a `PlayerPortalEvent` listener.
+**World regeneration (in-RAM, no restart, no folder deletion).** This is the
+key design. On game over, players go to the lobby and a brand-new world is
+created:
+
+- **Unique world names** — `game_1`, `game_2`, … via a persisted counter.
+  A never-reused name can't collide with a still-loaded world, so
+  `createWorld()` *always* generates a fresh world with a new random seed
+  (an existing folder would make Paper reload the old world and ignore the
+  seed — that was the original "same map" bug).
+- **`setAutoSave(false)` + `setKeepSpawnInMemory(false)`** — the game world
+  lives entirely in RAM and is **never written to disk** as `.mca` region
+  files. Nothing to lock, nothing to delete, nothing to accumulate, no
+  server restart. This is the same principle as Slime worlds used by large
+  networks, implemented natively with the Bukkit API (no fork, no
+  dependency). It fits hardcore perfectly: a world destroyed on death has
+  no reason to persist.
+- Old worlds are unloaded (`save=false`); the tiny `level.dat` stub is
+  removed by an async, GC-assisted deleter, with a guaranteed sweep on the
+  next server start as a safety net.
+- Time is reset to morning, weather cleared, difficulty forced to `HARD`.
+- Nether/End portal linking between the non-default worlds is handled by a
+  `PlayerPortalEvent` listener.
+
+**Everything resets each game.** New world (seed/spawn/biomes), and for every
+player: advancements revoked, statistics zeroed, **discovered recipes
+cleared (recipe-unlock toasts fire again)**, ender chest emptied, inventory
+/ XP / potion effects / fire / freeze / speeds reset, shared health & hunger
+pool refilled. A new run truly starts from zero, like joining a fresh server.
 
 **Player locator bar.** `GameRule.LOCATOR_BAR` is explicitly forced on in the
 game worlds so teammates can always find each other in the shared world.
@@ -254,6 +287,33 @@ game worlds so teammates can always find each other in the shared world.
 ---
 
 ## Troubleshooting
+
+### Run only ONE server instance
+
+The #1 cause of locked/undeleted worlds and corruption is **two servers
+running on the same folder** (e.g. double-clicking `start.bat` twice, or
+relaunching before the previous process exited). Symptoms in the log:
+`Address already in use: bind`, `the file is used by another process`.
+Always close the previous server window and wait for full shutdown before
+relaunching.
+
+### "Old maps pile up / aren't deleted"
+
+By design this no longer affects gameplay: each run is a brand-new unique
+world (`game_N`) and the game world is **kept in RAM, never written to
+disk** (`setAutoSave(false)`), so no region files accumulate. Any tiny
+leftover `level.dat` stub is cleaned asynchronously and, as a guaranteed
+net, **wiped on the next server startup**. `/hc cleanworlds` triggers a
+best-effort sweep in-session. On Windows you can never delete a world a
+*running* server still holds — that's an OS limitation, not a bug; the
+in-RAM design sidesteps it entirely.
+
+### High memory on very long runs
+
+The game world is in RAM. Hardcore runs are short (they end on first
+death), so this is normally fine. If players explore extremely far on a
+long run, lower `view-distance` / `simulation-distance` in
+`server.properties`.
 
 ### Crash: `WorldFolderMigration` / `Failed to migrate world storage`
 
@@ -291,12 +351,13 @@ warnings are expected on Paper 26 and do not affect functionality.
 
 ## Validation
 
-The full server-side cycle has been validated on **Paper 26.1.2 / Java 25**:
-void lobby generation, run start, world creation, game over (`/hc stop`),
-world deletion + recreation with a new seed, countdown, automatic restart and
-stat persistence — across multiple back-to-back cycles, with **no exceptions
-and no file-lock failures**. The shared life/hunger mechanic is best
-experienced in-game with multiple connected players.
+The full server-side cycle has been validated on **Paper 26.1.2 / Java 25**
+across multiple back-to-back cycles: void lobby, run start, unique-named
+in-RAM world creation with a **new random seed / spawn / biome every game**
+(verified: forest → sparse_jungle → savanna), game over (`/hc stop`),
+countdown, automatic relaunch and stat persistence — with **no exceptions**.
+The shared life/hunger mechanic and the per-player full reset are best
+experienced in-game with real connected players.
 
 ---
 

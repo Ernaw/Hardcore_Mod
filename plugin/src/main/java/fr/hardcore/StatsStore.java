@@ -16,6 +16,7 @@ public class StatsStore {
     private int gamesPlayed;
     private long lastGameDurationSec;
     private long bestGameDurationSec;
+    private int worldCounter;
 
     public StatsStore(HardcorePlugin plugin) {
         this.file = new File(plugin.getDataFolder(), "stats.yml");
@@ -32,12 +33,14 @@ public class StatsStore {
         gamesPlayed = cfg.getInt("games-played", 0);
         lastGameDurationSec = cfg.getLong("last-game-duration-sec", 0);
         bestGameDurationSec = cfg.getLong("best-game-duration-sec", 0);
+        worldCounter = cfg.getInt("world-counter", 0);
     }
 
     public void save() {
         cfg.set("games-played", gamesPlayed);
         cfg.set("last-game-duration-sec", lastGameDurationSec);
         cfg.set("best-game-duration-sec", bestGameDurationSec);
+        cfg.set("world-counter", worldCounter);
         try {
             cfg.save(file);
         } catch (IOException e) {
@@ -48,6 +51,21 @@ public class StatsStore {
     /** Appele au demarrage d'une nouvelle partie. */
     public void incrementGames() {
         gamesPlayed++;
+        save();
+    }
+
+    /** Identifiant de monde unique, jamais reutilise (noms de monde). */
+    public int nextWorldId() {
+        worldCounter++;
+        save();
+        return worldCounter;
+    }
+
+    /** Remet toutes les statistiques a zero (garde le compteur de mondes). */
+    public void resetAll() {
+        gamesPlayed = 0;
+        lastGameDurationSec = 0;
+        bestGameDurationSec = 0;
         save();
     }
 

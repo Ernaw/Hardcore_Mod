@@ -4,12 +4,18 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Statistic;
 import org.bukkit.World;
+import org.bukkit.advancement.Advancement;
+import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.boss.BarColor;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+
+import java.util.Iterator;
 
 /**
  * Machine a etats du jeu : enchaine lobby -> regeneration -> partie.
@@ -33,6 +39,9 @@ public class GameManager {
     /** Demarrage du plugin : lobby pret, boucles lancees. */
     public void init() {
         plugin.getWorldManager().ensureLobby();
+        // Supprime tout monde de jeu residuel d'une session precedente
+        // (crash, arret brutal) pour repartir totalement propre.
+        plugin.getWorldManager().cleanupAllGameWorlds();
         state = GameState.LOBBY;
 
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -166,10 +175,74 @@ public class GameManager {
         p.setLevel(0);
         p.setFireTicks(0);
         p.setFallDistance(0f);
+        resetProgress(p);
         p.setGameMode(GameMode.SURVIVAL);
         p.teleport(spawn);
         p.setBedSpawnLocation(spawn, true);
         plugin.getSharedLife().trackPlayer(p);
+    }
+
+    /**
+     * Remet le joueur a l'etat "tout neuf", comme s'il rejoignait un
+     * serveur vierge : succes, statistiques, recettes decouvertes
+     * (les notifications de nouvelles recettes reapparaitront),
+     * ender chest, vitesses, air, gel, fleches plantees, effets.
+     */
+    private void resetProgress(Player p) {
+        // 1) Succes / advancements
+        Iterator<Advancement> it = Bukkit.advancementIterator();
+        while (it.hasNext()) {
+            Advancement a = it.next();
+            AdvancementProgress prog = p.getAdvancementProgress(a);
+            for (String crit : new java.util.ArrayList<>(prog.getAwardedCriteria())) {
+                prog.revokeCriteria(crit);
+            }
+        }
+
+        // 2) Statistiques
+        for (Statistic stat : Statistic.values()) {
+            try {
+                switch (stat.getType()) {
+                    case UNTYPED -> p.setStatistic(stat, 0);
+                    case BLOCK, ITEM -> {
+                        for (Material m : Material.values()) {
+                            try { p.setStatistic(stat, m, 0); } catch (Exception ignored) {}
+                        }
+                    }
+                    case ENTITY -> {
+                        for (EntityType et : EntityType.values()) {
+                            try { p.setStatistic(stat, et, 0); } catch (Exception ignored) {}
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        // 3) Recettes decouvertes -> les toasts "nouvelle recette" reviennent
+        try {
+            for (org.bukkit.NamespacedKey k :
+                    new java.util.ArrayList<>(p.getDiscoveredRecipes())) {
+                p.undiscoverRecipe(k);
+            }
+        } catch (Throwable ignored) {
+        }
+
+        // 4) Etat "physique" du joueur
+        p.getEnderChest().clear();
+        for (PotionEffect e : p.getActivePotionEffects()) {
+            p.removePotionEffect(e.getType());
+        }
+        p.setExp(0f);
+        p.setLevel(0);
+        p.setTotalExperience(0);
+        p.setFireTicks(0);
+        p.setFallDistance(0f);
+        try { p.setFreezeTicks(0); } catch (Throwable ignored) {}
+        try { p.setArrowsInBody(0); } catch (Throwable ignored) {}
+        try { p.setRemainingAir(p.getMaximumAir()); } catch (Throwable ignored) {}
+        p.setWalkSpeed(0.2f);
+        p.setFlySpeed(0.1f);
     }
 
     /** Recoit un joueur qui se connecte en pleine partie. */
@@ -186,6 +259,7 @@ public class GameManager {
         plugin.getLobbyManager().removeFromLobby(p);
         plugin.getLobbyManager().clearScoreboard(p);
         p.getInventory().clear();
+        resetProgress(p);
         p.setGameMode(GameMode.SURVIVAL);
         p.teleport(target);
         plugin.getSharedLife().trackPlayer(p);

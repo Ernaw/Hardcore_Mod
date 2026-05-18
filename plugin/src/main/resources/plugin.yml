@@ -7,9 +7,8 @@ author: Erwan
 description: Hardcore coop a vie et faim partagees, regeneration totale du monde a chaque mort, lobby avec statistiques.
 commands:
   hc:
-    description: Commandes admin du mode Hardcore partage
-    usage: /hc <start|stop|stats|reload>
-    permission: hardcoreshared.admin
+    description: Commandes du mode Hardcore partage
+    usage: /hc <stats|start|stop|reload|resetstats>
 permissions:
   hardcoreshared.admin:
     description: Acces aux commandes admin
