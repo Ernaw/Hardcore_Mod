@@ -1,0 +1,66 @@
+# ===========================================================
+#  Bundled JDK — too large for GitHub (jdk/lib/modules > 100MB)
+#  Install Java 25 (Temurin) separately, or re-download it.
+# ===========================================================
+/jdk/
+
+# ===========================================================
+#  Downloaded / generated server binaries (not source)
+# ===========================================================
+/server/paper.jar
+/server/libraries/
+/server/versions/
+/server/cache/
+/server/logs/
+/server/crash-reports/
+/server/*.log
+/server/*.err.log
+/server/server.pid
+/downloads/
+
+# ===========================================================
+#  Generated worlds (recreated automatically at runtime)
+# ===========================================================
+/server/hub/
+/server/hub_nether/
+/server/hub_the_end/
+/server/game/
+/server/game_nether/
+/server/game_the_end/
+/server/world/
+/server/world_nether/
+/server/world_the_end/
+
+# ===========================================================
+#  Build output & runtime plugin data
+# ===========================================================
+/server/plugins/HardcoreShared.jar
+/server/plugins/HardcoreShared/stats.yml
+/plugin/build/
+/plugin/paper-api.jar
+
+# ===========================================================
+#  Server runtime / generated state & default Paper configs
+#  (regenerated on first launch — keep the repo source-only)
+# ===========================================================
+/server/banned-ips.json
+/server/banned-players.json
+/server/ops.json
+/server/whitelist.json
+/server/usercache.json
+/server/version_history.json
+/server/help.yml
+/server/commands.yml
+/server/permissions.yml
+/server/spigot.yml
+/server/config/
+/server/plugins/.paper-remapped/
+/server/plugins/bStats/
+/server/plugins/spark/
+/server/plugins/HardcoreShared/
+
+# ===========================================================
+#  Misc
+# ===========================================================
+*.tmp
+*.class

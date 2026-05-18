@@ -1,0 +1,32 @@
+# ==========================================================
+#  HardcoreShared - Configuration
+# ==========================================================
+
+# Nombre minimum de joueurs connectes pour lancer une partie.
+min-players-to-start: 1
+
+# Lance automatiquement une partie quand le minimum de joueurs est atteint.
+auto-start: true
+
+# Temps d'attente dans le lobby (en secondes) entre la fin de
+# la regeneration du monde et le debut de la partie suivante.
+regen-countdown-seconds: 12
+
+# Difficulte appliquee au monde de jeu (PEACEFUL, EASY, NORMAL, HARD).
+difficulty: HARD
+
+# Active le Nether et l'End pour le monde de jeu.
+nether-enabled: true
+end-enabled: true
+
+# Vie / faim de depart partagees (20 = barre pleine).
+start-health: 20.0
+start-food: 20
+
+# Nom du monde lobby (void) et du monde de jeu (regenere).
+lobby-world: hub
+game-world: game
+
+# Coordonnees du spawn du lobby.
+lobby-spawn:
+  y: 101
