@@ -1,6 +1,9 @@
 package fr.hardcore;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -8,17 +11,19 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.potion.PotionEffect;
-import org.bukkit.scoreboard.DisplaySlot;
-import org.bukkit.scoreboard.Objective;
-import org.bukkit.scoreboard.Scoreboard;
 
 /**
  * Gere l'experience du lobby : teleportation, nettoyage du joueur,
- * barre de boss (etat / compte a rebours) et tableau de stats.
+ * barre de boss (etat / compte a rebours) et HOLOGRAMME de stats
+ * (texte flottant au-dessus de la place centrale de l'ile).
  */
 public class LobbyManager {
+
+    private static final String HOLO_TAG = "hc_holo";
 
     private final HardcorePlugin plugin;
     private final BossBar bossBar;
@@ -56,7 +61,7 @@ public class LobbyManager {
         p.teleport(spawn);
 
         bossBar.addPlayer(p);
-        applyScoreboard(p);
+        updateHologram();
         // Son d'arrivee au lobby + carillon de stats.
         Sounds.to(plugin, p, "block.note_block.bell", 0.7f, 1.2f);
         Sounds.to(plugin, p, "entity.experience_orb.pickup", 0.6f, 1f);
@@ -80,41 +85,56 @@ public class LobbyManager {
         bossBar.setProgress(Math.max(0.0, Math.min(1.0, progress)));
     }
 
-    /** Tableau de stats affiche sur le cote pour un joueur du lobby. */
-    public void applyScoreboard(Player p) {
-        Scoreboard sb = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective obj = sb.registerNewObjective("hc", "dummy",
-                "§6§lHARDCORE PARTAGE");
-        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
-
-        StatsStore st = plugin.getStats();
-        int line = 10;
-        obj.getScore("§7§m            ").setScore(line--);
-        obj.getScore("§fParties jouees:").setScore(line--);
-        obj.getScore("§e" + st.getGamesPlayed()).setScore(line--);
-        obj.getScore("§0 ").setScore(line--);
-        obj.getScore("§fDerniere survie:").setScore(line--);
-        obj.getScore("§a" + StatsStore.formatDuration(st.getLastGameDurationSec()))
-                .setScore(line--);
-        obj.getScore("§0  ").setScore(line--);
-        obj.getScore("§fRecord de survie:").setScore(line--);
-        obj.getScore("§b" + StatsStore.formatDuration(st.getBestGameDurationSec()))
-                .setScore(line--);
-        obj.getScore("§7§m           ").setScore(line--);
-
-        p.setScoreboard(sb);
-    }
-
-    /** Rafraichit le tableau de stats de tous les joueurs du lobby. */
-    public void refreshAllScoreboards() {
+    /**
+     * (Re)cree l'hologramme de stats flottant au-dessus de la place
+     * centrale de l'ile et y ecrit les statistiques courantes.
+     */
+    public void updateHologram() {
         World hub = Bukkit.getWorld(plugin.getWorldManager().getLobbyName());
         if (hub == null) return;
-        for (Player p : hub.getPlayers()) {
-            applyScoreboard(p);
+
+        // Supprime l'ancien hologramme (evite les doublons).
+        for (org.bukkit.entity.Entity e :
+                new java.util.ArrayList<>(hub.getEntities())) {
+            if (e instanceof TextDisplay && e.getScoreboardTags().contains(HOLO_TAG)) {
+                e.remove();
+            }
         }
+
+        StatsStore st = plugin.getStats();
+        String txt = String.join("\n",
+                "§6§l✦ HARDCORE PARTAGE ✦",
+                "§8§m                        ",
+                "§7Parties jouees : §e§l" + st.getGamesPlayed(),
+                "§7Derniere survie : §a"
+                        + StatsStore.formatDuration(st.getLastGameDurationSec()),
+                "§7Record de survie : §b"
+                        + StatsStore.formatDuration(st.getBestGameDurationSec()),
+                "§8§m                        ",
+                "§7Etat : §f" + etatLisible());
+
+        int spawnY = plugin.getConfig().getInt("lobby-spawn.y", 101);
+        Location loc = new Location(hub, 0.5, spawnY + 3.4, 0.5);
+
+        TextDisplay td = hub.spawn(loc, TextDisplay.class);
+        td.text(LegacyComponentSerializer.legacySection().deserialize(txt));
+        td.setBillboard(Display.Billboard.CENTER);
+        td.setAlignment(TextDisplay.TextAlignment.CENTER);
+        td.setSeeThrough(true);
+        td.setShadowed(true);
+        td.setDefaultBackground(false);
+        try { td.setBackgroundColor(Color.fromARGB(90, 0, 0, 0)); }
+        catch (Throwable ignored) {}
+        td.setViewRange(3.0f);
+        td.addScoreboardTag(HOLO_TAG);
+        td.setPersistent(false);
     }
 
-    public void clearScoreboard(Player p) {
-        p.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
+    private String etatLisible() {
+        return switch (plugin.getGameManager().getState()) {
+            case RUNNING -> "§cPartie en cours";
+            case REGENERATING -> "§eRegeneration du monde";
+            case LOBBY -> "§aEn attente";
+        };
     }
 }

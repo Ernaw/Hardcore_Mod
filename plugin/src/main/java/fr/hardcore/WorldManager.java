@@ -67,8 +67,19 @@ public class WorldManager {
             throw new IllegalStateException("Impossible de creer le monde lobby '" + lobbyName + "'");
         }
         configureLobby(hub);
-        buildLobbyPlatform(hub);
+        // Garde la zone du lobby toujours chargee (ile + hologramme
+        // toujours presents, meme sans joueur connecte).
+        for (int cx = -2; cx <= 2; cx++) {
+            for (int cz = -2; cz <= 2; cz++) {
+                hub.setChunkForceLoaded(cx, cz, true);
+            }
+        }
+        buildLobbyIsland(hub);
         return hub;
+    }
+
+    private void set(World w, int x, int y, int z, Material m) {
+        w.getBlockAt(x, y, z).setType(m, false);
     }
 
     private void configureLobby(World hub) {
@@ -88,21 +99,157 @@ public class WorldManager {
         hub.setSpawnLocation(0, y, 0);
     }
 
-    /** Construit une petite plateforme de quartz sous le spawn du lobby. */
-    private void buildLobbyPlatform(World hub) {
-        int y = plugin.getConfig().getInt("lobby-spawn.y", 101) - 1;
-        int r = 5;
-        for (int x = -r; x <= r; x++) {
-            for (int z = -r; z <= r; z++) {
-                Block b = hub.getBlockAt(x, y, z);
-                boolean edge = (x == -r || x == r || z == -r || z == r);
-                b.setType(edge ? Material.SMOOTH_QUARTZ : Material.QUARTZ_BLOCK, false);
-                // barriere de securite pour ne pas tomber dans le vide
-                hub.getBlockAt(x, y + 1, z).setType(
-                        edge ? Material.BARRIER : Material.AIR, false);
+    /**
+     * Construit une ile flottante decoree pour le lobby : herbe + relief,
+     * dessous en pierre/amethyste qui s'effile, arbres, fleurs, lanternes,
+     * place centrale, petit bassin et garde-corps invisible.
+     */
+    private void buildLobbyIsland(World hub) {
+        int spawnY = plugin.getConfig().getInt("lobby-spawn.y", 101);
+        int top = spawnY - 1;          // surface d'herbe (le joueur spawn dessus)
+        int R = 13;                    // rayon de l'ile
+
+        // ----- Corps de l'ile : surface + sous-sol qui s'effile -----
+        for (int x = -R - 2; x <= R + 2; x++) {
+            for (int z = -R - 2; z <= R + 2; z++) {
+                double d = Math.sqrt(x * x + z * z);
+                double ang = Math.atan2(z, x);
+                double edge = R + 1.8 * Math.sin(ang * 3) + 1.2 * Math.cos(ang * 5);
+                if (d > edge) continue;
+
+                set(hub, x, top, z, Material.GRASS_BLOCK);
+                set(hub, x, top - 1, z, Material.DIRT);
+                set(hub, x, top - 2, z, Material.DIRT);
+
+                // profondeur : l'ile s'effile vers une pointe
+                int depth = (int) Math.round((edge - d) * 1.15) + 3;
+                for (int i = 3; i <= depth; i++) {
+                    Material mat = (i >= depth - 1) ? Material.COBBLESTONE
+                            : (i % 4 == 0 ? Material.ANDESITE : Material.STONE);
+                    set(hub, x, top - i, z, mat);
+                }
+                // pointe centrale en amethyste + dripstone qui pend
+                if (d < 3) {
+                    set(hub, x, top - depth - 1, z, Material.AMETHYST_BLOCK);
+                    set(hub, x, top - depth - 2, z, Material.POINTED_DRIPSTONE);
+                }
+                // mousse + lichen lumineux par endroits sur le dessous
+                if (((x * 7 + z * 13) & 7) == 0) {
+                    set(hub, x, top - 3, z, Material.MOSS_BLOCK);
+                }
+                // garde-corps invisible sur le pourtour
+                if (d > edge - 1.0) {
+                    for (int hY = 1; hY <= 3; hY++) {
+                        set(hub, x, top + hY, z, Material.BARRIER);
+                    }
+                }
             }
         }
-        hub.getBlockAt(0, y + 1, 0).setType(Material.AIR, false);
+
+        // ----- Place centrale (5x5) + gazebo -----
+        for (int x = -2; x <= 2; x++) {
+            for (int z = -2; z <= 2; z++) {
+                boolean ring = (Math.abs(x) == 2 || Math.abs(z) == 2);
+                set(hub, x, top, z, ring ? Material.CHISELED_STONE_BRICKS
+                        : Material.POLISHED_BLACKSTONE);
+                set(hub, x, top + 1, z, Material.AIR);
+            }
+        }
+        set(hub, 2, top, 2, Material.SEA_LANTERN);
+        set(hub, -2, top, 2, Material.SEA_LANTERN);
+        set(hub, 2, top, -2, Material.SEA_LANTERN);
+        set(hub, -2, top, -2, Material.SEA_LANTERN);
+        // 4 colonnes + lanternes (gazebo)
+        int[][] pil = {{3, 3}, {-3, 3}, {3, -3}, {-3, -3}};
+        for (int[] c : pil) {
+            for (int hY = 1; hY <= 4; hY++) set(hub, c[0], top + hY, c[1], Material.OAK_FENCE);
+            set(hub, c[0], top + 5, c[1], Material.SEA_LANTERN);
+            set(hub, c[0], top + 1, c[1], Material.LANTERN);
+        }
+
+        // ----- Chemins en briques vers 4 belvederes -----
+        for (int i = 3; i <= R - 2; i++) {
+            set(hub, i, top, 0, Material.STONE_BRICKS);
+            set(hub, -i, top, 0, Material.STONE_BRICKS);
+            set(hub, 0, top, i, Material.STONE_BRICKS);
+            set(hub, 0, top, -i, Material.STONE_BRICKS);
+        }
+
+        // ----- Arbres (alternance chene / cerisier) -----
+        int[][] trees = {{8, 3}, {-7, 6}, {5, -8}, {-8, -5}, {9, -2}};
+        for (int t = 0; t < trees.length; t++) {
+            buildTree(hub, trees[t][0], top + 1, trees[t][1], t % 2 == 0);
+        }
+
+        // ----- Fleurs, herbes hautes, lanternes posees -----
+        Material[] flowers = {Material.POPPY, Material.DANDELION,
+                Material.CORNFLOWER, Material.OXEYE_DAISY, Material.AZURE_BLUET};
+        for (int x = -R; x <= R; x++) {
+            for (int z = -R; z <= R; z++) {
+                if (hub.getBlockAt(x, top, z).getType() != Material.GRASS_BLOCK) continue;
+                int h = Math.abs(x * 31 + z * 17);
+                if (h % 11 == 0) {
+                    set(hub, x, top + 1, z, flowers[h % flowers.length]);
+                } else if (h % 4 == 0) {
+                    set(hub, x, top + 1, z, Material.SHORT_GRASS);
+                }
+                // eclairage discret sous la surface
+                if (h % 23 == 0) set(hub, x, top - 1, z, Material.SEA_LANTERN);
+            }
+        }
+        set(hub, 6, top + 1, 0, Material.LANTERN);
+        set(hub, -6, top + 1, 0, Material.LANTERN);
+        set(hub, 0, top + 1, 6, Material.LANTERN);
+        set(hub, 0, top + 1, -6, Material.LANTERN);
+
+        // ----- Petit bassin d'eau contenu (sans debordement) -----
+        for (int x = 7; x <= 9; x++) {
+            for (int z = 6; z <= 8; z++) {
+                set(hub, x, top, z, Material.PRISMARINE);
+            }
+        }
+        set(hub, 8, top, 7, Material.WATER);
+        set(hub, 8, top + 1, 7, Material.AIR);
+
+        // ----- Petite cascade decorative en verre teinte (cote) -----
+        for (int yy = 0; yy < 6; yy++) {
+            set(hub, -R, top - yy, 0, yy < 3
+                    ? Material.LIGHT_BLUE_STAINED_GLASS : Material.BLUE_STAINED_GLASS);
+        }
+
+        // ----- Lianes qui pendent du pourtour -----
+        for (int a = 0; a < 360; a += 25) {
+            int x = (int) Math.round(Math.cos(Math.toRadians(a)) * (R - 1));
+            int z = (int) Math.round(Math.sin(Math.toRadians(a)) * (R - 1));
+            if (hub.getBlockAt(x, top, z).getType() == Material.GRASS_BLOCK) {
+                for (int yy = 1; yy <= 3 + (a % 3); yy++) {
+                    set(hub, x, top - 2 - yy, z, Material.VINE);
+                }
+            }
+        }
+
+        // colonne d'air au spawn
+        for (int yy = 1; yy <= 3; yy++) set(hub, 0, top + yy, 0, Material.AIR);
+        hub.setSpawnLocation(0, spawnY, 0);
+    }
+
+    /** Petit arbre (chene si oak=true, sinon cerisier). */
+    private void buildTree(World w, int x, int y, int z, boolean oak) {
+        Material log = oak ? Material.OAK_LOG : Material.CHERRY_LOG;
+        Material leaf = oak ? Material.OAK_LEAVES : Material.CHERRY_LEAVES;
+        int h = 4 + ((x + z) & 1);
+        for (int i = 0; i < h; i++) set(w, x, y + i, z, log);
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -1; dy <= 2; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    if (Math.sqrt(dx * dx + dy * dy + dz * dz) > 2.4) continue;
+                    int bx = x + dx, by = y + h - 1 + dy, bz = z + dz;
+                    if (w.getBlockAt(bx, by, bz).getType() == Material.AIR) {
+                        set(w, bx, by, bz, leaf);
+                    }
+                }
+            }
+        }
     }
 
     /**

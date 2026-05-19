@@ -65,7 +65,7 @@ public class DamageFeedback implements Listener {
 
         String hearts = fmt(dmg / 2.0);
         String src = sourceOf(e);
-        show("§c❤ §e" + victim.getName()
+        show("§e" + victim.getName()
                 + " §7a perdu §c" + hearts + "❤"
                 + (src != null ? " §8(" + src + ")" : "")
                 /*+ " §7• vie commune"*/, 3);

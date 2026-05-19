@@ -43,6 +43,7 @@ public class GameManager {
         // (crash, arret brutal) pour repartir totalement propre.
         plugin.getWorldManager().cleanupAllGameWorlds();
         state = GameState.LOBBY;
+        plugin.getLobbyManager().updateHologram();
 
         for (Player p : Bukkit.getOnlinePlayers()) {
             plugin.getLobbyManager().sendToLobby(p);
@@ -122,7 +123,7 @@ public class GameManager {
     /** Compte a rebours visible avant la prochaine partie. */
     private void startCountdown() {
         final int total = plugin.getConfig().getInt("regen-countdown-seconds", 12);
-        plugin.getLobbyManager().refreshAllScoreboards();
+        plugin.getLobbyManager().updateHologram();
         countdownTask = new BukkitRunnable() {
             int remaining = total;
             @Override
@@ -177,7 +178,6 @@ public class GameManager {
 
     private void preparePlayerForGame(Player p, Location spawn) {
         plugin.getLobbyManager().removeFromLobby(p);
-        plugin.getLobbyManager().clearScoreboard(p);
         for (PotionEffect e : p.getActivePotionEffects()) {
             p.removePotionEffect(e.getType());
         }
@@ -268,7 +268,6 @@ public class GameManager {
             if (!other.equals(p)) { target = other.getLocation(); break; }
         }
         plugin.getLobbyManager().removeFromLobby(p);
-        plugin.getLobbyManager().clearScoreboard(p);
         p.getInventory().clear();
         resetProgress(p);
         p.setGameMode(GameMode.SURVIVAL);

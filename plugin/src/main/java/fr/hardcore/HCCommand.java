@@ -81,7 +81,7 @@ public class HCCommand implements CommandExecutor {
             case "resetstats" -> {
                 if (!isAdmin(s)) { noPerm(s); return true; }
                 plugin.getStats().resetAll();
-                plugin.getLobbyManager().refreshAllScoreboards();
+                plugin.getLobbyManager().updateHologram();
                 s.sendMessage("§aStatistiques remises a zero.");
             }
             case "testdamage" -> {
