@@ -135,6 +135,15 @@ public class GameManager {
                 plugin.getLobbyManager().setBossBar(
                         "§aNouvelle partie dans " + remaining + "s",
                         (double) remaining / total, BarColor.GREEN);
+                // Bip de compte a rebours, de plus en plus aigu ; les 3
+                // dernieres secondes plus marquees.
+                float pitch = 0.7f + (float) (total - remaining) / total;
+                if (remaining <= 3) {
+                    Sounds.all(plugin, "block.note_block.pling", 1f, 1.6f);
+                } else {
+                    Sounds.all(plugin, "block.note_block.hat", 0.8f,
+                            Math.min(2f, pitch));
+                }
                 remaining--;
             }
         }.runTaskTimer(plugin, 0L, 20L);
@@ -162,6 +171,8 @@ public class GameManager {
         Bukkit.broadcastMessage("§6§l>> Nouvelle partie ! Vie et faim partagees. Bonne chance ! <<");
         Bukkit.getOnlinePlayers().forEach(p ->
                 p.sendTitle("§c§lHARDCORE", "§7La survie est commune...", 10, 50, 20));
+        // Cri du Wither au lancement d'une nouvelle partie.
+        Sounds.all(plugin, "entity.wither.spawn", 1f, 1f);
     }
 
     private void preparePlayerForGame(Player p, Location spawn) {
@@ -281,6 +292,8 @@ public class GameManager {
         for (Player p : Bukkit.getOnlinePlayers()) {
             p.sendTitle("§4§lMORT", "§7Le monde se regenere entierement...", 10, 60, 20);
         }
+        // Mort du Wither = fin de partie.
+        Sounds.all(plugin, "entity.wither.death", 1f, 1f);
 
         // Petit delai pour laisser voir le titre, puis retour lobby + cycle.
         new BukkitRunnable() {

@@ -30,3 +30,9 @@ game-world: game
 # Coordonnees du spawn du lobby.
 lobby-spawn:
   y: 101
+
+# Sons (lobby, compte a rebours, cri du Wither au lancement, fin de partie).
+sounds-enabled: true
+
+# Indicateur de degats au-dessus de la barre d'XP (qui perd des coeurs).
+damage-indicator-enabled: true

@@ -13,6 +13,7 @@ public class HardcorePlugin extends JavaPlugin {
     private LobbyManager lobbyManager;
     private SharedLifeManager sharedLife;
     private GameManager gameManager;
+    private DamageFeedback damageFeedback;
 
     @Override
     public void onEnable() {
@@ -24,8 +25,11 @@ public class HardcorePlugin extends JavaPlugin {
         this.lobbyManager = new LobbyManager(this);
         this.sharedLife = new SharedLifeManager(this);
         this.gameManager = new GameManager(this);
+        this.damageFeedback = new DamageFeedback(this);
 
         getServer().getPluginManager().registerEvents(new Listeners(this), this);
+        getServer().getPluginManager().registerEvents(damageFeedback, this);
+        damageFeedback.start();
         if (getCommand("hc") != null) {
             getCommand("hc").setExecutor(new HCCommand(this));
         }
@@ -73,5 +77,9 @@ public class HardcorePlugin extends JavaPlugin {
 
     public GameManager getGameManager() {
         return gameManager;
+    }
+
+    public DamageFeedback getDamageFeedback() {
+        return damageFeedback;
     }
 }

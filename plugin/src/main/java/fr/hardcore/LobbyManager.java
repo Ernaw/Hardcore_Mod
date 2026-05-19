@@ -57,6 +57,9 @@ public class LobbyManager {
 
         bossBar.addPlayer(p);
         applyScoreboard(p);
+        // Son d'arrivee au lobby + carillon de stats.
+        Sounds.to(plugin, p, "block.note_block.bell", 0.7f, 1.2f);
+        Sounds.to(plugin, p, "entity.experience_orb.pickup", 0.6f, 1f);
     }
 
     public void removeFromLobby(Player p) {

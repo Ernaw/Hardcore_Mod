@@ -2,6 +2,7 @@ package fr.hardcore;
 
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.entity.Player;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -35,6 +36,7 @@ public class HCCommand implements CommandExecutor {
             s.sendMessage("§6/hc reload §7- recharger la configuration §8(admin)");
             s.sendMessage("§6/hc resetstats §7- remettre les stats a zero §8(admin)");
             s.sendMessage("§6/hc cleanworlds §7- supprimer les anciens mondes §8(admin)");
+            s.sendMessage("§6/hc testdamage [coeurs] §7- tester l'indicateur de degats §8(admin)");
             return true;
         }
 
@@ -81,6 +83,28 @@ public class HCCommand implements CommandExecutor {
                 plugin.getStats().resetAll();
                 plugin.getLobbyManager().refreshAllScoreboards();
                 s.sendMessage("§aStatistiques remises a zero.");
+            }
+            case "testdamage" -> {
+                if (!isAdmin(s)) { noPerm(s); return true; }
+                double hearts = 2.0;
+                if (args.length > 1) {
+                    try { hearts = Double.parseDouble(args[1]); }
+                    catch (NumberFormatException ignored) {}
+                }
+                boolean inGame = s instanceof Player p
+                        && plugin.getGameManager().getState() == GameState.RUNNING
+                        && p.getWorld().getName().startsWith(
+                                plugin.getWorldManager().getGameName());
+                if (inGame) {
+                    ((Player) s).damage(hearts * 2.0);
+                    s.sendMessage("§a" + hearts + "❤ de degats reels appliques "
+                            + "(indicateur + son).");
+                } else {
+                    plugin.getDamageFeedback().show("§c❤ §eTEST §7a perdu §c"
+                            + hearts + "❤ §8(simulation) §7• vie commune", 5);
+                    s.sendMessage("§aSimulation affichee dans l'action bar "
+                            + "(connecte-toi en partie pour un test reel).");
+                }
             }
             case "cleanworlds" -> {
                 if (!isAdmin(s)) { noPerm(s); return true; }

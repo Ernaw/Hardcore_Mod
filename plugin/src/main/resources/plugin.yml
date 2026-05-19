@@ -8,7 +8,7 @@ description: Hardcore coop a vie et faim partagees, regeneration totale du monde
 commands:
   hc:
     description: Commandes du mode Hardcore partage
-    usage: /hc <stats|start|stop|reload|resetstats>
+    usage: /hc <stats|start|stop|reload|resetstats|cleanworlds|testdamage>
 permissions:
   hardcoreshared.admin:
     description: Acces aux commandes admin
