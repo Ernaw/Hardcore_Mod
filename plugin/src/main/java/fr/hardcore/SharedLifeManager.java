@@ -81,55 +81,41 @@ public class SharedLifeManager {
         java.util.Collection<? extends Player> all = Bukkit.getOnlinePlayers();
         String gameWorld = plugin.getWorldManager().getGameName();
 
-        double healthDelta = 0;
+        // NOUVELLE METHODE de sync :
+        // - La VIE est partagee via la REPLICATION du degat dans
+        //   DamageFeedback : vanilla applique le degat a chaque joueur,
+        //   ce qui declenche son hurt, animation rouge et knockback
+        //   reels pour TOUT LE MONDE. On n'a donc plus besoin
+        //   d'agregation/setHealth ici, et la fin de partie est
+        //   detectee via PlayerDeathEvent (Listeners.onDeath).
+        // - La FAIM/SATURATION reste agregee (pas d'evenement vanilla
+        //   adapte a une replication propre).
         double foodDelta = 0;
         double satDelta = 0;
+        double minH = Double.POSITIVE_INFINITY;
         boolean anyInGame = false;
 
         for (Player p : all) {
             if (!p.getWorld().getName().startsWith(gameWorld)) continue;
             anyInGame = true;
             UUID id = p.getUniqueId();
-            maxHealth = maxHealthOf(p);
-
-            double lh = lastHealth.getOrDefault(id, sharedHealth);
             double lf = lastFood.getOrDefault(id, sharedFood);
             double ls = lastSaturation.getOrDefault(id, sharedSaturation);
-
-            healthDelta += (p.getHealth() - lh);
             foodDelta += (p.getFoodLevel() - lf);
             satDelta += (p.getSaturation() - ls);
+            minH = Math.min(minH, p.getHealth());
         }
-
         if (!anyInGame) return;
 
-        sharedHealth = clamp(sharedHealth + healthDelta, 0, maxHealth);
         sharedFood = clamp(sharedFood + foodDelta, 0, 20);
         sharedSaturation = clamp(sharedSaturation + satDelta, 0, 20);
+        if (Double.isFinite(minH)) sharedHealth = minH;   // pour /hc stats
 
-        // Plus de vie commune -> fin de partie.
-        if (sharedHealth <= 0.0001) {
-            gameOverFired = true;
-            plugin.getGameManager().onGameOver("La vie commune est epuisee");
-            for (Player p : all) {
-                if (p.getWorld().getName().startsWith(gameWorld)
-                        && p.getHealth() > 0) {
-                    p.setHealth(0.0);
-                }
-            }
-            return;
-        }
-
-        // Reapplique la valeur commune a tous les joueurs en partie.
         for (Player p : all) {
             if (!p.getWorld().getName().startsWith(gameWorld)) continue;
             UUID id = p.getUniqueId();
-            double max = maxHealthOf(p);
-            double h = Math.max(0.5, Math.min(sharedHealth, max));
-            p.setHealth(h);
             p.setFoodLevel((int) Math.round(sharedFood));
             p.setSaturation((float) sharedSaturation);
-            lastHealth.put(id, p.getHealth());
             lastFood.put(id, (double) p.getFoodLevel());
             lastSaturation.put(id, (double) p.getSaturation());
         }

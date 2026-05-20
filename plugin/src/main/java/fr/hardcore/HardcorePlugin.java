@@ -29,6 +29,7 @@ public class HardcorePlugin extends JavaPlugin {
 
         getServer().getPluginManager().registerEvents(new Listeners(this), this);
         getServer().getPluginManager().registerEvents(damageFeedback, this);
+        getServer().getPluginManager().registerEvents(new EffectSync(this), this);
         damageFeedback.start();
         if (getCommand("hc") != null) {
             getCommand("hc").setExecutor(new HCCommand(this));
